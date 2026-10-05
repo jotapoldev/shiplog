@@ -1,0 +1,199 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-heading: var(--font-display);
+  --font-display: var(--font-display);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* Superficies con tinte azul de marca, nunca gris plano. */
+:root {
+  --background: #edf2fa;
+  --foreground: #13213d;
+  --card: #f8fafe;
+  --card-foreground: #13213d;
+  --popover: #f8fafe;
+  --popover-foreground: #13213d;
+  --primary: #2b59e0;
+  --primary-foreground: #f8fafe;
+  --secondary: #dfe7f5;
+  --secondary-foreground: #13213d;
+  --muted: #e3eaf6;
+  --muted-foreground: #5a6b8c;
+  --accent: #dfe7f5;
+  --accent-foreground: #13213d;
+  --destructive: #c8372d;
+  --border: #d5dff0;
+  --input: #c9d5ea;
+  --ring: #2b59e0;
+  --radius: 0.625rem;
+  --heat-0: #dde5f3;
+
+  --t-feat: #2b59e0;
+  --t-fix: #d9581a;
+  --t-refactor: #7c4ddb;
+  --t-chore: #6a7fa6;
+  --t-docs: #0d8f70;
+  --t-style: #0b8fc7;
+  --t-perf: #b98a00;
+  --t-test: #b5279f;
+  --t-ci: #557a1f;
+  --t-build: #94612e;
+  --t-other: #8e9bb5;
+
+
+  /* Ramas: color por familia (vista /ramas). */
+  --b-main: #13213d;
+  --b-uat: #0d8f70;
+  --b-staging: #0b8fc7;
+  --b-qa: #b98a00;
+  --b-develop: #2b59e0;
+  --b-hotfix: #d9581a;
+  --b-release: #b5279f;
+  --b-feature: #7c4ddb;
+  --b-other: #8e9bb5;
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.dark {
+  --background: #0a1324;
+  --foreground: #e4ebf7;
+  --card: #0f1b31;
+  --card-foreground: #e4ebf7;
+  --popover: #0f1b31;
+  --popover-foreground: #e4ebf7;
+  --primary: #6e92ff;
+  --primary-foreground: #0a1324;
+  --secondary: #172642;
+  --secondary-foreground: #e4ebf7;
+  --muted: #142139;
+  --muted-foreground: #8d9dbd;
+  --accent: #172642;
+  --accent-foreground: #e4ebf7;
+  --destructive: #ff7a6e;
+  --border: #1d2c48;
+  --input: #263859;
+  --ring: #6e92ff;
+  --heat-0: #15223b;
+
+  --t-feat: #6e92ff;
+  --t-fix: #ff8a4c;
+  --t-refactor: #a98bff;
+  --t-chore: #8ea2c8;
+  --t-docs: #3fcfa4;
+  --t-style: #4cc3f5;
+  --t-perf: #e8bd3a;
+  --t-test: #ec6fd6;
+  --t-ci: #a8cc5c;
+  --t-build: #dcaa72;
+  --t-other: #75839f;
+
+  --b-main: #e4ebf7;
+  --b-uat: #3fcfa4;
+  --b-staging: #4cc3f5;
+  --b-qa: #e8bd3a;
+  --b-develop: #6e92ff;
+  --b-hotfix: #ff8a4c;
+  --b-release: #ec6fd6;
+  --b-feature: #a98bff;
+  --b-other: #75839f;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+/* Única coreografía de carga: las semanas del heatmap aparecen en orden. */
+.heat-col {
+  animation: heat-in 360ms var(--ease-out) both;
+  animation-delay: calc(var(--i) * 7ms);
+}
+@keyframes heat-in {
+  from { opacity: 0; transform: translateY(4px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .heat-col { animation: none; }
+}
+.press { transition: transform 140ms var(--ease-out); }
+.press:active { transform: scale(0.97); }
+
+/* Cuerpo de memorias en markdown */
+.md > * + * { margin-top: 0.6em; }
+.md h1, .md h2, .md h3 { font-weight: 600; }
+.md ul { list-style: disc; padding-left: 1.25rem; }
+.md ol { list-style: decimal; padding-left: 1.25rem; }
+.md li + li { margin-top: 0.2em; }
+.md code { font-family: var(--font-mono); font-size: 0.85em; background: var(--muted); padding: 0.1em 0.35em; border-radius: 0.3em; }
+.md pre { overflow-x: auto; background: var(--muted); padding: 0.75rem; border-radius: 0.6rem; }
+.md pre code { background: none; padding: 0; }
+.md a { color: var(--primary); text-decoration: underline; text-underline-offset: 2px; }
+.md strong { font-weight: 600; }
+
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+
+/* Grafo de ramas: al resaltar una familia se atenúa el resto sin re-renderizar filas. */
+.graph[data-focus] li[data-fam] { opacity: 0.35; }
+.graph[data-focus] path[data-fam] { opacity: 0.12; }
+.graph[data-focus] circle[data-fam] { opacity: 0.2; }
+.graph[data-focus="main"] :is(li, path, circle)[data-fam="main"],
+.graph[data-focus="uat"] :is(li, path, circle)[data-fam="uat"],
+.graph[data-focus="staging"] :is(li, path, circle)[data-fam="staging"],
+.graph[data-focus="qa"] :is(li, path, circle)[data-fam="qa"],
+.graph[data-focus="develop"] :is(li, path, circle)[data-fam="develop"],
+.graph[data-focus="hotfix"] :is(li, path, circle)[data-fam="hotfix"],
+.graph[data-focus="release"] :is(li, path, circle)[data-fam="release"],
+.graph[data-focus="feature"] :is(li, path, circle)[data-fam="feature"],
+.graph[data-focus="other"] :is(li, path, circle)[data-fam="other"] { opacity: 1; }
