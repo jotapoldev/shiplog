@@ -23,13 +23,18 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           {READONLY && (
             <p className="bg-primary px-4 py-2 text-center text-sm text-primary-foreground">
               Demo de solo lectura con repos de ejemplo. Para usarlo con los tuyos,{" "}
-              <a className="font-semibold underline underline-offset-4" href="https://github.com/jotapoldev/shiplog">
+              <a className="font-semibold underline underline-offset-4" href="https://github.com/jotapoldev/shiplog" target="_blank" rel="noreferrer">
                 instalá Shiplog desde GitHub
               </a>
               .
             </p>
           )}
           <MotionProvider>{children}</MotionProvider>
+          <footer className="pb-8 text-center text-xs text-muted-foreground">
+            <a className="hover:text-foreground" href="https://github.com/jotapoldev/shiplog/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">
+              Shiplog v{process.env.SHIPLOG_VERSION}
+            </a>
+          </footer>
           <Toaster position="bottom-center" />
         </ThemeProvider>
       </body>
