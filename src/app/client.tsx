@@ -7,6 +7,7 @@ import { useTheme } from "next-themes";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { syncSummary } from "@/lib/sync-summary";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -185,9 +186,10 @@ export function SyncButton() {
   const [pending, start] = useTransition();
   const run = (quiet: boolean) =>
     start(async () => {
-      const { added, errors } = await sync();
+      const res = await sync();
+      const { added, updated, errors } = res;
       errors.forEach((e) => toast.error(e));
-      if (!quiet || added) toast.success(added ? `${added} commits nuevos` : "Todo al día");
+      if (!quiet || added || updated) toast.success(syncSummary(res));
     });
 
   useEffect(() => {

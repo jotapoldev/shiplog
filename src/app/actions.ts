@@ -8,7 +8,7 @@ import { autoLink, createTask, linkCommits, setTaskStatus } from "@/lib/tasks";
 import { READONLY, READONLY_MSG } from "@/lib/config";
 
 export async function sync() {
-  if (READONLY) return { added: 0, errors: [READONLY_MSG] };
+  if (READONLY) return { added: 0, updated: 0, errors: [READONLY_MSG] };
   const res = await syncRepos();
   revalidatePath("/");
   return res;

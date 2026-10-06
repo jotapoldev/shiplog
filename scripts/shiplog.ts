@@ -39,14 +39,15 @@ async function closeDb() {
 if (cmd === "sync") {
   const repo = args[0];
   const viaServer = await post(`/api/sync${repo ? `?repo=${encodeURIComponent(repo)}` : ""}`);
-  let res: { added: number; errors: string[] };
+  let res: { added: number; updated: number; errors: string[] };
   if (viaServer) res = viaServer.data;
   else {
     const { syncRepos } = await import("../src/lib/sync.ts");
     res = await syncRepos(repo);
     await closeDb();
   }
-  console.log(`shiplog (${viaServer ? "servidor" : "directo"}): ${res.added} commits nuevos`);
+  const { syncSummary } = await import("../src/lib/sync-summary.ts");
+  console.log(`shiplog (${viaServer ? "servidor" : "directo"}): ${syncSummary(res)}`);
   for (const e of res.errors) console.error(`  ${e}`);
   process.exitCode = res.errors.length && !res.added ? 1 : 0;
 } else if (cmd === "task") {

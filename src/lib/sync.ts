@@ -42,11 +42,13 @@ export async function syncRepos(only?: string) {
   if (!only) await registerDiscovered();
   else {
     const { error } = await addRepoPath(only);
-    if (error) return { added: 0, errors: [error] };
+    if (error) return { added: 0, updated: 0, errors: [error] };
   }
   const db = await getDb();
   const targets = (await activeRepos()).filter((r) => !only || samePath(r.path, only));
   let added = 0;
+  // Filas que ya existían y cambiaron (casi siempre: el commit llegó a otra rama).
+  let updated = 0;
   const errors: string[] = [];
   for (const { path, branches } of targets) {
     try {
@@ -63,14 +65,16 @@ export async function syncRepos(only?: string) {
             setWhere: sql`${commits.branches} is distinct from excluded.branches or (${commits.body} is null and excluded.body is not null)`,
           })
           .returning({ inserted: sql<boolean>`xmax = 0` });
-        added += res.filter((r) => r.inserted).length;
+        const inserted = res.filter((r) => r.inserted).length;
+        added += inserted;
+        updated += res.length - inserted;
       }
     } catch (e) {
       errors.push(`${repoName(path)}: ${e instanceof Error ? e.message.split("\n")[0] : e}`);
     }
   }
   await autoLink();
-  return { added, errors };
+  return { added, updated, errors };
 }
 
 /** Ambientes que muestra cada repo en sus cuadritos: los que eligió o develop → qa → uat → main. */
