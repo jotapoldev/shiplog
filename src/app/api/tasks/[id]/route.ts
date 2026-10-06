@@ -2,11 +2,13 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb, tasks } from "@/lib/db";
 import { setTaskStatus } from "@/lib/tasks";
+import { READONLY, READONLY_MSG } from "@/lib/config";
 
 const badId = () => Response.json({ error: "El id debe ser un número entero, por ejemplo /api/tasks/12." }, { status: 400 });
 
 // PATCH /api/tasks/:id  { "status": "pending" | "doing" | "done" }
 export async function PATCH(req: Request, { params }: RouteContext<"/api/tasks/[id]">) {
+  if (READONLY) return Response.json({ error: READONLY_MSG }, { status: 403 });
   const id = Number((await params).id);
   if (!Number.isInteger(id) || id < 1) return badId();
   const body = await req.json().catch(() => null);
@@ -18,6 +20,7 @@ export async function PATCH(req: Request, { params }: RouteContext<"/api/tasks/[
 
 // DELETE /api/tasks/:id
 export async function DELETE(_req: Request, { params }: RouteContext<"/api/tasks/[id]">) {
+  if (READONLY) return Response.json({ error: READONLY_MSG }, { status: 403 });
   const id = Number((await params).id);
   if (!Number.isInteger(id) || id < 1) return badId();
   const gone = await (await getDb()).delete(tasks).where(eq(tasks.id, id)).returning({ id: tasks.id });
