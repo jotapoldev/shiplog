@@ -3,9 +3,9 @@
 //
 // Los repos tienen develop/qa/uat/main, features que se mergean, un hotfix por cherry-pick y commits
 // de otra persona. Cada uno tiene su "origin" (repo bare local), así la vista de ramas tiene qué comparar.
-// La base y la memoria de la demo viven en .demo/, separadas de las tuyas.
+// La base y los repos de la demo viven en .demo/, separados de los tuyos.
 import { execFileSync, spawn } from "node:child_process";
-import { appendFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const DIR = resolve(".demo");
@@ -166,19 +166,6 @@ build(
   ),
 );
 
-// Memoria de Claude Code de ejemplo para la vista Pendientes.
-const mem = join(DIR, "memory");
-mkdirSync(mem, { recursive: true });
-writeFileSync(
-  join(mem, "MEMORY.md"),
-  [
-    "- [Cupones: falta probar en uat](cupones-uat.md) — pendiente: validar cupones vencidos en uat antes de pasar a main",
-    "- [Webhooks del banco](webhooks.md) — sin commitear: reintentos con backoff en api-pagos",
-  ].join("\n") + "\n",
-);
-writeFileSync(join(mem, "cupones-uat.md"), "---\nname: cupones-uat\nmetadata:\n  type: project\n---\n\nPendiente probar en uat el fix de cupones vencidos de tienda-web.\n");
-writeFileSync(join(mem, "webhooks.md"), "---\nname: webhooks\nmetadata:\n  type: project\n---\n\nCambios sin commitear en api-pagos: reintentos con backoff para los webhooks del banco.\n");
-
 console.log(`Repos de ejemplo listos en ${ROOT}`);
 
 if (!process.argv.includes("--no-dev")) {
@@ -186,6 +173,6 @@ if (!process.argv.includes("--no-dev")) {
   const next = join("node_modules", "next", "dist", "bin", "next");
   spawn(process.execPath, [next, "dev", "-H", "127.0.0.1", "-p", String(PORT)], {
     stdio: "inherit",
-    env: { ...process.env, SHIPLOG_ROOT: ROOT, SHIPLOG_DATA: join(DIR, "data"), SHIPLOG_MEMORY_DIR: mem, SHIPLOG_DIST: ".demo/next" },
+    env: { ...process.env, SHIPLOG_ROOT: ROOT, SHIPLOG_DATA: join(DIR, "data"), SHIPLOG_DIST: ".demo/next" },
   });
 }

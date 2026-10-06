@@ -6,9 +6,8 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 const EASE = [0.23, 1, 0.32, 1] as const;
-const ENVS = ["develop", "qa", "uat", "main"];
 
-export type MiniCommit = { id: string; repo: string; type: string; scope: string | null; subject: string; hash: string; branches: string | null };
+export type MiniCommit = { id: string; repo: string; type: string; scope: string | null; subject: string; hash: string; branches: string | null; envs: string[] };
 
 function groupBy<T>(rows: T[], key: (r: T) => string) {
   const m = new Map<string, T[]>();
@@ -16,13 +15,14 @@ function groupBy<T>(rows: T[], key: (r: T) => string) {
   return m;
 }
 
-/** Cuatro cuadritos dev/qa/uat/main: lleno = ya está en esa rama remota. */
-function Envs({ branches }: { branches: string | null }) {
-  const b = new Set((branches ?? "").replace("master", "main").split(","));
+/** Un cuadrito por rama que sigue el repo (dev/qa/uat/main por defecto): lleno = ya está en esa rama remota. */
+function Envs({ branches, envs }: { branches: string | null; envs: string[] }) {
+  const b = new Set((branches ?? "").split(","));
+  const has = (e: string) => b.has(e) || (e === "main" && b.has("master"));
   return (
     <span className="flex gap-0.5" title={branches ? `En ${branches.replace(/,/g, ", ")}` : "Solo local"}>
-      {ENVS.map((e) => (
-        <span key={e} className={cn("size-1.5 rounded-[2px]", b.has(e) ? "bg-primary" : "ring-1 ring-border ring-inset")} />
+      {envs.map((e) => (
+        <span key={e} className={cn("size-1.5 rounded-[2px]", has(e) ? "bg-primary" : "ring-1 ring-border ring-inset")} />
       ))}
     </span>
   );
@@ -75,7 +75,7 @@ function Topic({ label, commits }: { label: string; commits: MiniCommit[] }) {
                   {c.type === "other" ? "sin tipo" : c.type}
                 </span>
                 <span className="min-w-0 flex-1 break-words">{c.subject}</span>
-                <Envs branches={c.branches} />
+                <Envs branches={c.branches} envs={c.envs} />
                 <span className="hidden w-16 shrink-0 font-mono text-xs text-muted-foreground sm:inline" title={c.hash}>
                   {c.hash.slice(0, 7)}
                 </span>

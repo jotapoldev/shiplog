@@ -1,15 +1,12 @@
 import Link from "next/link";
 import { fmt, rangeLabel } from "@/lib/dates";
+import { DEFAULT_ENVS } from "@/lib/git";
 import { type Commit, norm, queryTokens, search, stem } from "@/lib/search";
+import { envsByRepo } from "@/lib/sync";
 import { cn } from "@/lib/utils";
 import { CopyButton } from "./client";
 
-const ENVS = [
-  ["develop", "dev"],
-  ["qa", "qa"],
-  ["uat", "uat"],
-  ["main", "main"],
-] as const;
+const short = (env: string) => (env === "develop" ? "dev" : env);
 const PLURAL: Record<string, string> = { fix: "fixes", ci: "ci", other: "sin tipo" };
 const plural = (t: string, n: number) => (n === 1 ? (t === "other" ? "sin tipo" : t) : (PLURAL[t] ?? `${t}s`));
 const nCommits = (n: number) => `${n} ${n === 1 ? "commit" : "commits"}`;
@@ -36,18 +33,18 @@ function Hl({ text, toks }: { text: string; toks: string[] }) {
   );
 }
 
-function EnvChips({ c }: { c: Commit }) {
+function EnvChips({ c, list }: { c: Commit; list: string[] }) {
   const b = envs(c);
   if (!b.size) return <span className="rounded-full bg-[color-mix(in_oklab,var(--t-fix)_15%,transparent)] px-2 py-0.5 text-[11px] font-semibold text-[var(--t-fix)]">solo local</span>;
   return (
     <span className="flex gap-0.5">
-      {ENVS.map(([k, label]) => (
+      {list.map((k) => (
         <span
           key={k}
           title={b.has(k) ? `Está en origin/${k}` : `No está en origin/${k}`}
           className={cn("rounded px-1 text-[10px] font-semibold tabular-nums", b.has(k) ? "bg-primary text-primary-foreground" : "text-muted-foreground/50 ring-1 ring-border")}
         >
-          {label}
+          {short(k)}
         </span>
       ))}
     </span>
@@ -55,14 +52,14 @@ function EnvChips({ c }: { c: Commit }) {
 }
 
 /** "Todo en develop; 12 en qa, 3 en main; 2 solo locales." */
-function envSentence(cs: Commit[]) {
+function envSentence(cs: Commit[], ENVS: string[]) {
   const n = (k: string) => cs.filter((c) => envs(c).has(k)).length;
   const local = cs.filter((c) => !envs(c).size).length;
-  const parts = ENVS.map(([k]) => [k, n(k)] as const).filter(([, x]) => x > 0);
+  const parts = ENVS.map((k) => [k, n(k)] as const).filter(([, x]) => x > 0);
   if (!parts.length) return `Nada subido todavía: ${local === 1 ? "el commit está" : `los ${local} commits están`} solo en local.`;
   const all = parts.filter(([, x]) => x === cs.length).map(([k]) => k);
   const some = parts.filter(([, x]) => x < cs.length).map(([k, x]) => `${x} en ${k}`);
-  const missing = ENVS.map(([k]) => k).filter((k) => !n(k));
+  const missing = ENVS.filter((k) => !n(k));
   return [
     all.length ? `Todo está en ${all.join(", ")}` : "",
     some.length ? some.join(", ") : "",
@@ -75,11 +72,12 @@ function envSentence(cs: Commit[]) {
 }
 
 export async function SearchView({ q, today }: { q: string; today: string }) {
-  const res = await search(q);
+  const [res, repoEnvs] = await Promise.all([search(q), envsByRepo()]);
+  const envsOf = (list: Commit[]) => [...new Set(list.flatMap((c) => repoEnvs[c.repo] ?? DEFAULT_ENVS))];
   const toks = queryTokens(q);
   const cs = res.commits;
 
-  if (!cs.length && !res.tasks.length && !res.notes.length && !res.memories.length)
+  if (!cs.length && !res.tasks.length && !res.notes.length)
     return (
       <div className="py-16">
         <p className="font-display text-[clamp(1.75rem,5vw,2.75rem)] leading-tight font-semibold tracking-tight">No encontré nada con «{q}».</p>
@@ -101,7 +99,7 @@ export async function SearchView({ q, today }: { q: string; today: string }) {
   const summaryText = [
     `«${q}»: ${headline}`,
     cs.length ? `Tipos: ${types.map(([t, n]) => `${n} ${plural(t, n)}`).join(", ")}.` : "",
-    cs.length ? `Ambientes: ${envSentence(cs)}` : "",
+    cs.length ? `Ambientes: ${envSentence(cs, envsOf(cs))}` : "",
     ...res.topics.slice(0, 8).map((t) => `- ${t.label}: ${nCommits(t.commits.length)} (${rangeLabel(t.commits.at(-1)!.day, t.commits[0].day)}), ${t.commits[0].subject}`),
   ]
     .filter(Boolean)
@@ -124,7 +122,7 @@ export async function SearchView({ q, today }: { q: string; today: string }) {
             ))}
             . Último: <span className="text-muted-foreground">{last.subject}</span> ({fmt(last.day, { day: "numeric", month: "short" })}).
           </p>
-          <p className="text-muted-foreground">{envSentence(cs)} Según el último fetch de cada repo.</p>
+          <p className="text-muted-foreground">{envSentence(cs, envsOf(cs))} Según el último fetch de cada repo.</p>
         </div>
       )}
       <div className="mt-3 -ml-2.5">
@@ -145,7 +143,7 @@ export async function SearchView({ q, today }: { q: string; today: string }) {
                   <span className="text-sm text-muted-foreground">
                     {rangeLabel(t.commits.at(-1)!.day, t.commits[0].day)}, {[...new Set(t.commits.map((c) => c.repo))].join(", ")}
                   </span>
-                  <span className="basis-full text-sm text-muted-foreground">{envSentence(t.commits)}</span>
+                  <span className="basis-full text-sm text-muted-foreground">{envSentence(t.commits, envsOf(t.commits))}</span>
                 </summary>
                 <ul className="space-y-2 border-t border-border px-4 pt-3 pb-4">
                   {t.commits.map((c) => (
@@ -164,7 +162,7 @@ export async function SearchView({ q, today }: { q: string; today: string }) {
                         {c.body && <span className="mt-0.5 line-clamp-2 block text-xs text-muted-foreground">{c.body}</span>}
                       </span>
                       <span className="col-start-2 mt-1 sm:col-start-3 sm:mt-0">
-                        <EnvChips c={c} />
+                        <EnvChips c={c} list={repoEnvs[c.repo] ?? DEFAULT_ENVS} />
                       </span>
                     </li>
                   ))}
@@ -212,22 +210,6 @@ export async function SearchView({ q, today }: { q: string; today: string }) {
         </section>
       )}
 
-      {res.memories.length > 0 && (
-        <section className="mt-10">
-          <h2 className="font-display text-xl font-semibold tracking-tight">En la memoria de Claude</h2>
-          <ul className="mt-3 space-y-2">
-            {res.memories.map((m) => (
-              <li key={m.file} className="text-sm">
-                <Link href="/?view=pendientes" className="font-medium hover:text-primary">
-                  <Hl text={m.title} toks={toks} />
-                </Link>
-                <span className="text-muted-foreground"> {m.hook}</span>
-                {m.date && <span className="ml-2 text-xs text-muted-foreground">{fmt(m.date, { day: "numeric", month: "short" })}</span>}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
       <p className="mt-10 text-xs text-muted-foreground">Hoy es {fmt(today, { weekday: "long", day: "numeric", month: "long" })}. Para ver lo subido más reciente, haz fetch en el repo y pulsa Sincronizar.</p>
     </div>
   );

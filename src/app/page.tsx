@@ -1,12 +1,16 @@
 import { and, count, desc, eq, gte, inArray, lte, max } from "drizzle-orm";
 import { Check, GitBranch, X } from "lucide-react";
 import Link from "next/link";
+import { cache } from "react";
 import { TYPES } from "@/lib/conventional";
 import { addDays, fmt, isDay, isMonth, mondayOf, monthEnd, monthLabel, rangeLabel, todayLocal } from "@/lib/dates";
-import { commits, getDb, notes, repos } from "@/lib/db";
-import { ROOT, repoName } from "@/lib/git";
+import { commits, getDb, notes } from "@/lib/db";
+import { activeRepos, envsByRepo } from "@/lib/sync";
+import { summarizeEnvs } from "@/lib/envs";
+import { DEFAULT_ENVS, ROOT, repoName } from "@/lib/git";
 import { AnimatedItem, AnimatedList, CopyButton, FadeIn, NoteEditor, RepoMenu, SearchBox, Swap, SyncButton, TabNav, ThemeToggle, ViewSwitch } from "./client";
 import { DayCommits } from "./day-commits";
+import { EnvSummary } from "./env-summary";
 import { Heatmap } from "./heatmap";
 import { SearchView } from "./search-view";
 import { FilterBar, FocusEscape } from "./filters";
@@ -18,6 +22,8 @@ const plural = (t: string, n: number) => (n === 1 ? t : (PLURAL[t] ?? `${t}s`));
 const nCommits = (n: number) => `${n} ${n === 1 ? "commit" : "commits"}`;
 
 type Commit = typeof commits.$inferSelect;
+/** Una lectura por request aunque haya muchos días en pantalla. */
+const repoEnvsCached = cache(envsByRepo);
 type Href = (patch: Record<string, string>) => string;
 
 function groupBy<T>(rows: T[], key: (r: T) => string) {
@@ -72,7 +78,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const [lo, hi] = month ? [`${month}-01`, monthEnd(month)] : [from, to];
 
-  const [rows, heat, week, weekNotes, rangeNotes, repoRows, taskData, repoStats] = await Promise.all([
+  const [rows, heat, week, weekNotes, rangeNotes, repoRows, taskData, repoStats, envGroups, repoEnvs] = await Promise.all([
     // En foco se trae el mes entero sin filtros: las facetas (repo/tipo/día) se calculan aquí.
     db.select().from(commits).where(and(gte(commits.day, lo), lte(commits.day, hi), ...(month ? [] : scope))).orderBy(desc(commits.authoredAt)),
     db
@@ -83,10 +89,13 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     db.select().from(commits).where(gte(commits.day, weekStart)).orderBy(desc(commits.authoredAt)),
     db.select().from(notes).where(inArray(notes.day, weekDays)),
     db.select().from(notes).where(and(gte(notes.day, lo), lte(notes.day, hi))),
-    db.select().from(repos),
+    activeRepos(),
     loadTasks(),
     db.select({ repo: commits.repo, n: count(), last: max(commits.authoredAt) }).from(commits).groupBy(commits.repo),
+    db.select({ repo: commits.repo, branches: commits.branches, n: count() }).from(commits).groupBy(commits.repo, commits.branches),
+    repoEnvsCached(),
   ]);
+  const envSummary = summarizeEnvs(envGroups.filter((g) => g.repo in repoEnvs), (r) => repoEnvs[r]);
   const doneMap = doneByDay(taskData.all);
   const doneCount = [...doneMap.values()].flat().length;
   const activeTasks = taskData.all.filter((t) => t.status !== "done").length;
@@ -168,12 +177,16 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
       <AutoRefresh />
       <FadeIn i={3}>
+        <EnvSummary repos={envSummary} />
+      </FadeIn>
+      <FadeIn i={3}>
         <TabNav
           active={view}
           items={[
             { v: "", label: "Commits", n: 0 },
             { v: "pendientes", label: "Pendientes", n: activeTasks },
             { v: "hechas", label: "Hechas", n: doneCount },
+            { v: "ramas", label: "Ramas", n: envSummary.filter((r) => r.pending).length, href: "/ramas" },
           ]}
         />
       </FadeIn>
@@ -271,7 +284,8 @@ function Empty() {
   );
 }
 
-function DayBlock({ day, cs, note, done = [], today }: { day: string; cs: Commit[]; note?: string; done?: DoneTask[]; today: string }) {
+async function DayBlock({ day, cs, note, done = [], today }: { day: string; cs: Commit[]; note?: string; done?: DoneTask[]; today: string }) {
+  const repoEnvs = await repoEnvsCached();
   return (
     <>
       <div className="sm:sticky sm:top-6 sm:self-start">
@@ -308,7 +322,7 @@ function DayBlock({ day, cs, note, done = [], today }: { day: string; cs: Commit
           </div>
         )}
         {cs.length > 0 && (
-          <DayCommits commits={cs.map(({ id, repo, type, scope, subject, hash, branches }) => ({ id, repo, type, scope, subject, hash, branches }))} />
+          <DayCommits commits={cs.map(({ id, repo, type, scope, subject, hash, branches }) => ({ id, repo, type, scope, subject, hash, branches, envs: repoEnvs[repo] ?? DEFAULT_ENVS }))} />
         )}
         <NoteEditor key={`${day}:${note ?? ""}`} day={day} initial={note ?? ""} />
       </div>

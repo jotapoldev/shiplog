@@ -1,0 +1,18 @@
+# Shiplog sin Node en la máquina: solo Docker.
+#   docker compose --env-file .env.local up -d --build
+# SHIPLOG_ROOT (en .env.local) es la carpeta de tus repos en el host; se monta de solo lectura.
+services:
+  shiplog:
+    build:
+      context: .
+      target: app
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3210:3210"
+    volumes:
+      - ${SHIPLOG_ROOT:?Define SHIPLOG_ROOT en .env.local}:/repos:ro
+      # La misma base que `pnpm dev`: tus tareas y notas siguen ahí. No corras los dos a la vez.
+      - ./data:/data
+    environment:
+      # Para traducir las rutas del host que llegan por /api/sync (hook después de cada commit).
+      SHIPLOG_HOST_ROOT: ${SHIPLOG_ROOT}

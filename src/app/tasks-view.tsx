@@ -1,10 +1,8 @@
 import { desc, eq, ne } from "drizzle-orm";
-import Markdown from "react-markdown";
 import { duration, fmt, mondayOf } from "@/lib/dates";
-import { commits, getDb, memoryState, taskCommits, tasks } from "@/lib/db";
-import { type Memory, readMemories } from "@/lib/memory";
+import { commits, getDb, taskCommits, tasks } from "@/lib/db";
 import { CopyButton } from "./client";
-import { AddTask, type LinkedCommit, MemoryCard, type MemoryView, TaskCard, type TaskView } from "./tasks-client";
+import { AddTask, type LinkedCommit, TaskCard, type TaskView } from "./tasks-client";
 
 type Task = typeof tasks.$inferSelect;
 
@@ -42,13 +40,7 @@ export function doneByDay(all: Task[]) {
   return m;
 }
 
-function toView(t: Task, byTask: Map<number, LinkedCommit[]>, memories: Map<string, Memory>): TaskView {
-  let suggestion: string | null = null;
-  if (t.memoryFile && t.status !== "done") {
-    const m = memories.get(t.memoryFile);
-    if (!m) suggestion = "La memoria de esta tarea ya no existe. ¿Ya está resuelta?";
-    else if (!m.open) suggestion = "La memoria ya no marca nada pendiente. ¿Ya está resuelta?";
-  }
+function toView(t: Task, byTask: Map<number, LinkedCommit[]>): TaskView {
   return {
     id: t.id,
     title: t.title,
@@ -60,7 +52,6 @@ function toView(t: Task, byTask: Map<number, LinkedCommit[]>, memories: Map<stri
     doneLabel: t.doneAt ? `hecha ${fmt(localDay(t.doneAt), { day: "numeric", month: "short" })} ${time(t.doneAt)}` : null,
     durationLabel: t.doneAt ? duration(t.doneAt.getTime() - t.createdAt.getTime()) : null,
     commits: byTask.get(t.id) ?? [],
-    suggestion,
   };
 }
 
@@ -76,81 +67,25 @@ function Section({ title, count, children }: { title: string; count: number; chi
   );
 }
 
-function Fold({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
-  if (!count) return null;
-  return (
-    <details className="group mt-8 rounded-2xl ring-1 ring-border">
-      <summary className="flex h-12 cursor-pointer items-center justify-between px-4 text-sm font-semibold">
-        <span>
-          {title} <span className="font-normal text-muted-foreground">{count}</span>
-        </span>
-        <span className="text-muted-foreground transition-transform group-open:rotate-180">▾</span>
-      </summary>
-      <div className="grid gap-3 px-3 pb-3">{children}</div>
-    </details>
-  );
-}
-
 export async function PendingView({ today }: { today: string }) {
-  const db = await getDb();
-  const [{ all, byTask }, states] = await Promise.all([loadTasks(), db.select().from(memoryState)]);
-  const memories = readMemories().filter((m) => m.type === "project");
-  const memMap = new Map(memories.map((m) => [m.file, m]));
-  const stateMap = new Map(states.map((s) => [s.file, s]));
-
+  const { all, byTask } = await loadTasks();
   const active = all.filter((t) => t.status !== "done").sort((a, b) => (a.status === b.status ? 0 : a.status === "doing" ? -1 : 1));
-  const view = (m: Memory): MemoryView => {
-    const st = stateMap.get(m.file);
-    const changed = Boolean(st && st.hash !== m.hash);
-    return {
-      file: m.file,
-      title: m.title,
-      hook: m.hook,
-      dateLabel: m.date ? fmt(m.date, { day: "numeric", month: "short", year: "numeric" }) : "",
-      repos: m.repos,
-      hash: m.hash,
-      updated: changed,
-      hidden: st?.status === "hidden" && !changed,
-      tracked: st?.status === "tracked",
-    };
-  };
-  const views = memories.map((m) => ({ m, v: view(m) }));
-  const quiet = (v: MemoryView) => stateMap.has(v.file) && !v.updated;
-  const openMem = views.filter(({ m, v }) => m.open && !quiet(v));
-  const context = views.filter(({ m, v }) => !m.open && !quiet(v));
-  const hidden = views.filter(({ v }) => v.hidden);
-  const card = ({ m, v }: { m: Memory; v: MemoryView }) => (
-    <MemoryCard key={m.file} m={v}>
-      <Markdown>{m.body}</Markdown>
-    </MemoryCard>
-  );
-
   return (
     <div className="pt-8">
       <AddTask />
       <Section title="Mis tareas" count={active.length}>
         {active.length ? (
-          active.map((t) => <TaskCard key={t.id} task={toView(t, byTask, memMap)} today={today} />)
+          active.map((t) => <TaskCard key={t.id} task={toView(t, byTask)} today={today} />)
         ) : (
-          <p className="text-sm text-muted-foreground">Nada en curso. Agrega una tarea arriba o empieza una de la memoria.</p>
+          <p className="text-sm text-muted-foreground">Nada en curso. Agrega una tarea arriba.</p>
         )}
       </Section>
-      <Section title="Pendientes en la memoria de Claude" count={openMem.length}>
-        {openMem.length ? openMem.map(card) : <p className="text-sm text-muted-foreground">La memoria no tiene trabajo abierto sin revisar.</p>}
-      </Section>
-      <Fold title="En curso o de contexto" count={context.length}>
-        {context.map(card)}
-      </Fold>
-      <Fold title="Ocultas" count={hidden.length}>
-        {hidden.map(card)}
-      </Fold>
     </div>
   );
 }
 
 export async function DoneView({ today }: { today: string }) {
   const { all, byTask } = await loadTasks();
-  const memMap = new Map(readMemories().map((m) => [m.file, m]));
   const done = all.filter((t) => t.status === "done" && t.doneAt).sort((a, b) => b.doneAt!.getTime() - a.doneAt!.getTime());
   if (!done.length)
     return (
@@ -189,7 +124,7 @@ export async function DoneView({ today }: { today: string }) {
                 <p className="pt-3 text-sm text-muted-foreground capitalize">{d === today ? "Hoy" : fmt(d, { weekday: "long", day: "numeric" })}</p>
                 <div className="grid gap-3">
                   {ts.map((t) => (
-                    <TaskCard key={t.id} task={toView(t, byTask, memMap)} today={today} />
+                    <TaskCard key={t.id} task={toView(t, byTask)} today={today} />
                   ))}
                 </div>
               </div>

@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
-import { ROOT } from "./config.ts";
+import { HOST_ROOT, ROOT } from "./config.ts";
 import { parseSubject } from "./conventional.ts";
 
 export { ROOT };
@@ -30,17 +30,58 @@ export function inScope(path: string) {
 
 export const isRepo = (path: string) => git(path, ["rev-parse", "--git-dir"]).then(() => true, () => false);
 
-/** Carpetas de primer nivel con .git propio; los worktrees (.git archivo) se saltan para no duplicar commits. */
-export const discoverRepos = () =>
-  readdirSync(ROOT)
-    .map((d) => join(ROOT, d))
-    .filter((p) => existsSync(join(p, ".git")) && statSync(join(p, ".git")).isDirectory());
+const SKIP = new Set(["node_modules", "vendor", "target", "dist", "build"]);
 
-/** Ramas remotas que cuentan como "subido", de menor a mayor ambiente. */
+/**
+ * Repos con .git propio en cualquier subcarpeta de ROOT. No entra a un repo ya encontrado ni a carpetas
+ * ocultas o de dependencias; los worktrees (.git archivo) se saltan para no duplicar commits.
+ * ponytail: tope de 6 niveles para no recorrer el disco entero; subirlo si hay repos más hondos.
+ */
+export function discoverRepos(dir = ROOT, depth = 0): string[] {
+  const git = join(dir, ".git");
+  if (depth > 0 && existsSync(git) && statSync(git).isDirectory()) return [dir];
+  if (depth >= 6) return [];
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return []; // sin permiso o borrada mientras se recorría
+  }
+  return entries
+    .filter((e) => e.isDirectory() && !e.name.startsWith(".") && !SKIP.has(e.name))
+    .flatMap((e) => discoverRepos(join(dir, e.name), depth + 1));
+}
+
+/** Traduce una ruta del host a la del contenedor (SHIPLOG_HOST_ROOT -> ROOT). Fuera de Docker no cambia nada. */
+export function toLocalPath(path: string) {
+  // Comparación de texto: el host puede ser Windows (C:\...) y el contenedor Linux, path.relative no sirve entre ambos.
+  const slash = (p: string) => p.trim().replace(/\\/g, "/").replace(/\/+$/, "");
+  const host = slash(HOST_ROOT);
+  const p = slash(path);
+  if (!host || !p.toLowerCase().startsWith(`${host.toLowerCase()}/`)) return path;
+  return ROOT + p.slice(host.length);
+}
+
+/** Ramas que se siguen si el repo no tiene su propia lista, de menor a mayor ambiente. */
 export const BRANCHES = ["develop", "qa", "uat", "main", "master"];
 
+/** Lo que se dibuja cuando el repo no eligió sus ramas (master cuenta como main). */
+export const DEFAULT_ENVS = ["develop", "qa", "uat", "main"];
+
+/** Ramas de origin según el último fetch, sin origin/HEAD. */
+export const remoteBranches = async (path: string) =>
+  (await git(path, ["branch", "-r", "--format=%(refname:short)"]))
+    .split(/\r?\n/)
+    .map((b) => b.trim())
+    .filter((b) => b.startsWith("origin/") && b !== "origin/HEAD")
+    .map((b) => b.slice("origin/".length));
+
+/** Ramas que sigue un repo, en orden de ambiente: las que eligió el usuario (repos.branches) o las por defecto, si existen. */
+export const trackedBranches = (saved: string | null, available: string[]) =>
+  (saved ? saved.split(",") : BRANCHES).filter((b) => available.includes(b));
+
 /** Commits propios (autor = git config user.email del repo), todas las ramas, sin merges. */
-export async function readCommits(path: string) {
+export async function readCommits(path: string, saved: string | null = null) {
   const email = (await git(path, ["config", "user.email"])).trim();
   if (!email) throw new Error(`${repoName(path)}: falta git config user.email`);
   const author = ["--no-merges", "--fixed-strings", `--author=${email}`];
@@ -50,9 +91,8 @@ export async function readCommits(path: string) {
 
   // En qué ramas remotas está cada commit, según el último fetch del usuario (aquí no se hace fetch).
   // Se compara por id (fecha de autor + subject), así un cherry-pick cuenta como subido.
-  const remotes = new Set((await git(path, ["branch", "-r", "--format=%(refname:short)"])).split(/\r?\n/).map((b) => b.trim()));
   const inBranch = new Map<string, Set<string>>();
-  for (const b of BRANCHES.filter((b) => remotes.has(`origin/${b}`))) {
+  for (const b of trackedBranches(saved, await remoteBranches(path))) {
     const ids = await git(path, ["log", `origin/${b}`, ...author, "--format=%aI%x1f%s"]);
     inBranch.set(b, new Set(ids.split(/\r?\n/).filter(Boolean).map((l) => idOf(...(l.split("\x1f") as [string, string])))));
   }

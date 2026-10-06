@@ -1,6 +1,5 @@
 import { desc } from "drizzle-orm";
 import { commits, getDb, notes, tasks } from "./db.ts";
-import { readMemories } from "./memory.ts";
 
 /** Minúsculas y sin tildes: "Configuración" == "configuracion". */
 export const norm = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
@@ -59,6 +58,5 @@ export async function search(q: string) {
     topics,
     tasks: allTasks.filter((t) => score([[t.title, 3], [t.keywords, 2], [t.note, 1], [t.repo, 1]])),
     notes: allNotes.filter((n) => score([[n.body, 1]])).sort((a, b) => b.day.localeCompare(a.day)),
-    memories: readMemories().filter((m) => score([[m.title, 3], [m.hook, 2], [m.body, 1]])),
   };
 }

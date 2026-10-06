@@ -48,7 +48,7 @@ export async function autoLink() {
 /** Valida y crea una tarea. La entrada viene de la UI, de POST /api/tasks o de `pnpm task`. */
 export async function createTask(input: unknown): Promise<{ error: string } | { task: Task }> {
   const o = (input ?? {}) as Record<string, unknown>;
-  for (const k of ["title", "repo", "note", "keywords", "memoryFile"])
+  for (const k of ["title", "repo", "note", "keywords"])
     if (o[k] !== undefined && typeof o[k] !== "string") return { error: `${k} debe ser texto.` };
   const str = (k: string) => (typeof o[k] === "string" ? (o[k] as string).trim() : "");
   const title = str("title");
@@ -65,7 +65,6 @@ export async function createTask(input: unknown): Promise<{ error: string } | { 
       repo: str("repo") || null,
       note: str("note").slice(0, 4000) || null,
       keywords: str("keywords") || null,
-      memoryFile: str("memoryFile") || null,
       status,
       startedAt: status === "pending" ? null : now,
       doneAt: status === "done" ? now : null,

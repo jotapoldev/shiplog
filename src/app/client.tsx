@@ -80,7 +80,7 @@ export function SearchBox({ initial }: { initial: string }) {
           } else ref.current?.blur();
         }}
         placeholder="Buscar: permisos, modo oscuro, #142"
-        aria-label="Buscar en commits, tareas, notas y memoria"
+        aria-label="Buscar en commits, tareas y notas"
         className="h-10 w-full rounded-full border border-input bg-card pr-4 pl-10 text-sm sm:pr-12 outline-none transition-shadow focus-visible:ring-3 focus-visible:ring-ring/50"
       />
       <kbd className="pointer-events-none absolute top-1/2 right-3 hidden -translate-y-1/2 rounded border border-border px-1.5 text-[11px] text-muted-foreground sm:block">
@@ -108,13 +108,14 @@ export function Swap({ k, children }: { k: string; children: React.ReactNode }) 
 }
 
 /** Pestañas con una píldora que se desliza hasta la activa. */
-export function TabNav({ items, active }: { items: { v: string; label: string; n: number }[]; active: string }) {
+/** Pestañas de la portada; con href la pestaña lleva a otra página (Ramas) en vez de cambiar ?view. */
+export function TabNav({ items, active }: { items: { v: string; label: string; n: number; href?: string }[]; active: string }) {
   return (
     <nav className="mb-4 flex gap-1 rounded-full bg-muted p-1 sm:w-max" aria-label="Secciones">
-      {items.map(({ v, label, n }) => (
+      {items.map(({ v, label, n, href }) => (
         <Link
           key={v}
-          href={v ? `/?view=${v}` : "/"}
+          href={href ?? (v ? `/?view=${v}` : "/")}
           scroll={false}
           aria-current={active === v ? "page" : undefined}
           className={cn(

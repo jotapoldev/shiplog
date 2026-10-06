@@ -2,11 +2,11 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
-import { index, integer, pgTable, primaryKey, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, index, integer, pgTable, primaryKey, serial, text, timestamp } from "drizzle-orm/pg-core";
 import { DATA_DIR } from "./config.ts";
-import { discoverRepos } from "./git.ts";
-
-export const repos = pgTable("repos", { path: text().primaryKey() });
+// ignored = el usuario lo quitó; el descubrimiento automático no lo vuelve a agregar.
+// branches = ramas que sigue, en orden de ambiente ("develop,qa,main"); null = las por defecto (BRANCHES).
+export const repos = pgTable("repos", { path: text().primaryKey(), ignored: boolean().notNull().default(false), branches: text() });
 
 // id = repo|fecha de autor|subject: un cherry-pick a qa/uat/main colapsa en la misma fila.
 export const commits = pgTable(
@@ -40,7 +40,6 @@ export const tasks = pgTable("tasks", {
   repo: text(),
   note: text(),
   keywords: text(),
-  memoryFile: text("memory_file"),
   status: text().$type<TaskStatus>().notNull().default("pending"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   startedAt: timestamp("started_at", { withTimezone: true }),
@@ -57,9 +56,6 @@ export const taskCommits = pgTable(
   (t) => [primaryKey({ columns: [t.taskId, t.commitId] })],
 );
 
-// Estado que el usuario le da a una memoria (oculta) junto al hash con que la vio: si el archivo cambia, reaparece.
-export const memoryState = pgTable("memory_state", { file: text().primaryKey(), status: text().notNull(), hash: text().notNull() });
-
 // ponytail: PGlite embebido (Postgres en WASM, datos en ./data). Para Postgres real:
 // cambiar a drizzle-orm/postgres-js + DATABASE_URL; el esquema y las queries no cambian.
 async function open() {
@@ -67,6 +63,8 @@ async function open() {
   const client = new PGlite(join(DATA_DIR, "pg"));
   await client.exec(`
     CREATE TABLE IF NOT EXISTS repos (path text PRIMARY KEY);
+    ALTER TABLE repos ADD COLUMN IF NOT EXISTS ignored boolean NOT NULL DEFAULT false;
+    ALTER TABLE repos ADD COLUMN IF NOT EXISTS branches text;
     CREATE TABLE IF NOT EXISTS commits (
       id text PRIMARY KEY, hash text NOT NULL, repo text NOT NULL, authored_at text NOT NULL,
       day text NOT NULL, type text NOT NULL, scope text, subject text NOT NULL
@@ -76,7 +74,7 @@ async function open() {
     CREATE INDEX IF NOT EXISTS commits_day_idx ON commits (day);
     CREATE TABLE IF NOT EXISTS notes (day text PRIMARY KEY, body text NOT NULL);
     CREATE TABLE IF NOT EXISTS tasks (
-      id serial PRIMARY KEY, title text NOT NULL, repo text, note text, keywords text, memory_file text,
+      id serial PRIMARY KEY, title text NOT NULL, repo text, note text, keywords text,
       status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'doing', 'done')),
       created_at timestamptz NOT NULL DEFAULT now(), started_at timestamptz, done_at timestamptz
     );
@@ -85,15 +83,14 @@ async function open() {
       commit_id text NOT NULL REFERENCES commits(id) ON DELETE CASCADE,
       source text NOT NULL, PRIMARY KEY (task_id, commit_id)
     );
-    CREATE TABLE IF NOT EXISTS memory_state (file text PRIMARY KEY, status text NOT NULL, hash text NOT NULL);
+    -- La integración con la memoria de Claude Code se quitó.
+    DROP TABLE IF EXISTS memory_state;
+    ALTER TABLE tasks DROP COLUMN IF EXISTS memory_file;
     -- ci/build antes caían en "other"; se reclasifican una vez (idempotente).
     UPDATE commits SET type = lower(substring(split_part(id, '|', 3) from '(?i)^(ci|build)'))
       WHERE type = 'other' AND split_part(id, '|', 3) ~* '^(ci|build)[(!:]';
   `);
   const db = drizzle({ client });
-  if ((await db.select().from(repos).limit(1)).length === 0) {
-    await db.insert(repos).values(discoverRepos().map((path) => ({ path })));
-  }
   return db;
 }
 

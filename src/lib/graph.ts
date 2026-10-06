@@ -3,7 +3,7 @@ import { statSync } from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { parseSubject } from "./conventional.ts";
-import { BRANCHES } from "./git.ts";
+import { trackedBranches } from "./git.ts";
 
 const run = promisify(execFile);
 const git = async (cwd: string, args: string[]) => (await run("git", ["-C", cwd, ...args], { maxBuffer: 64 * 1024 * 1024 })).stdout;
@@ -119,14 +119,14 @@ const parse = (l: string): RawCommit => {
 
 export type Pending = { from: string; to: string; commits: (RawCommit & { type: string; subject: string })[] };
 
-export async function readGraph(path: string, limit: number) {
+export async function readGraph(path: string, limit: number, saved: string | null = null) {
   const [tips, email] = await Promise.all([readTips(path), git(path, ["config", "user.email"]).then((s) => s.trim(), () => "")]);
   const refs = [...tips.values()];
   const commits = refs.length ? lines(await git(path, ["log", "--date-order", `-n${limit}`, FMT, ...new Set(refs)])).map(parse) : [];
   const graph = layout(commits, [...tips]);
 
   // Seguimiento entre ambientes: lo que una rama tiene y la siguiente no (cherry-picks cuentan como subidos).
-  const envs = BRANCHES.filter((b) => tips.has(b));
+  const envs = trackedBranches(saved, [...tips.keys()]);
   const envLogs = new Map(
     await Promise.all(envs.map(async (b) => [b, lines(await git(path, ["log", "--no-merges", FMT, tips.get(b)!])).map(parse)] as const)),
   );

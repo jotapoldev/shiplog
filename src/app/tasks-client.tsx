@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, EyeOff, Link2, Play, Plus, RotateCcw, Trash2, Undo2, X } from "lucide-react";
+import { Check, ChevronDown, Link2, Play, Plus, Trash2, Undo2, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import type { TaskStatus } from "@/lib/db";
 import { cn } from "@/lib/utils";
-import { ackMemory, addTask, commitsOfDay, deleteTask, hideMemory, moveTask, setKeywords, sync, toggleCommit } from "./actions";
+import { addTask, commitsOfDay, deleteTask, moveTask, setKeywords, sync, toggleCommit } from "./actions";
 
 const EASE = [0.23, 1, 0.32, 1] as const;
 
@@ -24,12 +24,11 @@ export type TaskView = {
   doneLabel: string | null;
   durationLabel: string | null;
   commits: LinkedCommit[];
-  suggestion: string | null;
 };
 
 const STATUS_LABEL: Record<TaskStatus, string> = { pending: "Por hacer", doing: "En curso", done: "Hecha" };
 
-/** Cada 5 min, con la pestaña visible: sincroniza commits y relee memoria. */
+/** Cada 5 min, con la pestaña visible: sincroniza commits. */
 export function AutoRefresh() {
   const router = useRouter();
   useEffect(() => {
@@ -155,14 +154,6 @@ export function TaskCard({ task, today }: { task: TaskView; today: string }) {
               <ChevronDown className={cn("size-3.5 transition-transform duration-200", open && "rotate-180")} />
             </div>
           </button>
-          {task.suggestion && (
-            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-primary/8 px-3 py-2 text-sm">
-              <span className="flex-1">{task.suggestion}</span>
-              <Button size="sm" className="press h-8" disabled={pending} onClick={() => move("done")}>
-                Marcar hecha
-              </Button>
-            </div>
-          )}
         </div>
         <div className="flex shrink-0 items-center">
           {task.status === "pending" && (
@@ -300,71 +291,5 @@ function TaskDetails({ task, today }: { task: TaskView; today: string }) {
         </Button>
       </div>
     </div>
-  );
-}
-
-export type MemoryView = { file: string; title: string; hook: string; dateLabel: string; repos: string[]; hash: string; updated: boolean; hidden: boolean; tracked: boolean };
-
-export function MemoryCard({ m, children }: { m: MemoryView; children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const [pending, start] = useTransition();
-  const track = (status: TaskStatus) =>
-    start(async () => {
-      const error = await addTask({ title: m.title, memoryFile: m.file, memoryHash: m.hash, status });
-      if (error) toast.error(error);
-    });
-
-  return (
-    <motion.div layout="position" className="rounded-2xl bg-card ring-1 ring-border">
-      <div className="p-4">
-        <button onClick={() => setOpen((o) => !o)} className="block w-full text-left" aria-expanded={open}>
-          <div className="flex items-start justify-between gap-3">
-            <p className="font-medium leading-snug">{m.title}</p>
-            <ChevronDown className={cn("mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform duration-200", open && "rotate-180")} />
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">{m.hook}</p>
-          <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
-            {m.updated && <span className="rounded-full bg-primary px-2 py-0.5 font-semibold text-primary-foreground">Actualizada</span>}
-            {m.dateLabel && <span className="text-muted-foreground">{m.dateLabel}</span>}
-            {m.repos.map((r) => (
-              <span key={r} className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground">
-                {r}
-              </span>
-            ))}
-          </div>
-        </button>
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {m.tracked ? (
-            <Button variant="outline" className="press h-10 gap-2" disabled={pending} onClick={() => start(() => ackMemory(m.file, m.hash))}>
-              <Check />
-              Visto, ya está en mis tareas
-            </Button>
-          ) : m.hidden ? (
-            <Button variant="ghost" className="h-10 gap-2" disabled={pending} onClick={() => start(() => hideMemory(m.file, ""))}>
-              <RotateCcw />
-              Mostrar de nuevo
-            </Button>
-          ) : (
-            <>
-              <Button variant="outline" className="press h-10 gap-2" disabled={pending} onClick={() => track("doing")}>
-                <Play />
-                Empezar
-              </Button>
-              <Button variant="outline" className="press h-10 gap-2" disabled={pending} onClick={() => track("done")}>
-                <Check />
-                Hecha
-              </Button>
-              <Button variant="ghost" className="h-10 gap-2 text-muted-foreground" disabled={pending} onClick={() => start(() => hideMemory(m.file, m.hash))}>
-                <EyeOff />
-                Ocultar
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-      <Reveal open={open}>
-        <div className="md border-t border-border px-4 pt-3 pb-4 text-sm">{children}</div>
-      </Reveal>
-    </motion.div>
   );
 }

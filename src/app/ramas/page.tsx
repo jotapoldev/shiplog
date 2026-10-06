@@ -2,10 +2,12 @@ import { count, desc, max } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { commits, getDb, repos } from "@/lib/db";
-import { ROOT, repoName } from "@/lib/git";
+import { commits, getDb } from "@/lib/db";
+import { activeRepos } from "@/lib/sync";
+import { ROOT, remoteBranches, repoName } from "@/lib/git";
 import { family, readGraph } from "@/lib/graph";
 import { FadeIn, RepoMenu, ThemeToggle } from "../client";
+import { BranchPicker } from "./branch-picker";
 import { Graph, Pipeline, RepoSelect } from "./graph";
 
 export const metadata: Metadata = { title: "Ramas · Shiplog" };
@@ -25,7 +27,7 @@ export default async function Ramas({ searchParams }: PageProps<"/ramas">) {
   const sp = await searchParams;
   const db = await getDb();
   const [repoRows, [latest], stats] = await Promise.all([
-    db.select().from(repos),
+    activeRepos(),
     db.select({ repo: commits.repo }).from(commits).orderBy(desc(commits.authoredAt)).limit(1),
     db.select({ repo: commits.repo, n: count(), last: max(commits.authoredAt) }).from(commits).groupBy(commits.repo),
   ]);
@@ -33,9 +35,13 @@ export default async function Ramas({ searchParams }: PageProps<"/ramas">) {
   const asked = typeof sp.repo === "string" ? sp.repo : "";
   const repo = names.includes(asked) ? asked : names.includes(latest?.repo ?? "") ? latest!.repo : names[0];
   const limit = LIMITS.includes(Number(sp.n)) ? Number(sp.n) : LIMITS[0];
-  const path = repoRows.find((r) => repoName(r.path) === repo)?.path;
+  const row = repoRows.find((r) => repoName(r.path) === repo);
+  const path = row?.path;
 
-  const res = path ? await readGraph(path, limit).catch((e: unknown) => (e instanceof Error ? e.message.split("\n")[0] : String(e))) : "";
+  const [res, available] = await Promise.all([
+    path ? readGraph(path, limit, row?.branches).catch((e: unknown) => (e instanceof Error ? e.message.split("\n")[0] : String(e))) : "",
+    path ? remoteBranches(path).catch(() => []) : [],
+  ]);
   const g = typeof res === "string" ? null : res;
   const error = typeof res === "string" ? res : "";
 
@@ -43,7 +49,7 @@ export default async function Ramas({ searchParams }: PageProps<"/ramas">) {
   const headline = !g
     ? ""
     : g.envs.length < 2
-      ? `${repo} no tiene ambientes remotos que comparar.`
+      ? `${repo} necesita al menos dos ramas para comparar ambientes. Elígelas abajo.`
       : gap
         ? `${gap.from} tiene ${nCommits(gap.commits.length)} que ${gap.to} todavía no tiene.`
         : `Todos los ambientes de ${repo} están al día.`;
@@ -95,6 +101,9 @@ export default async function Ramas({ searchParams }: PageProps<"/ramas">) {
                 <Pipeline envs={g.envs} fams={Object.fromEntries(g.envs.map((e) => [e, family(e)]))} promote={g.promote} backport={g.backport} email={g.email} />
               </FadeIn>
             )}
+            <FadeIn i={4}>
+              <BranchPicker key={`${repo}-${g.envs.join()}`} path={path!} available={available} tracked={g.envs} custom={!!row?.branches} />
+            </FadeIn>
           </section>
 
           <div>
