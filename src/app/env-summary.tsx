@@ -1,78 +1,59 @@
-import { ArrowRight, GitBranch } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import type { RepoEnvs } from "@/lib/envs";
-import { family } from "@/lib/graph";
 
-const short = (env: string) => (env === "develop" ? "dev" : env);
-const nCommits = (n: number) => `${n} ${n === 1 ? "commit" : "commits"}`;
-const SHOWN = 4;
+const SHOWN = 5;
 
-/** Portada: qué tan lejos está cada repo de producción, con entrada directa a su vista de ramas. */
+/** Portada: qué tan cerca de producción está lo tuyo en cada repo; cada fila lleva a su vista de ramas. */
 export function EnvSummary({ repos }: { repos: RepoEnvs[] }) {
   if (!repos.length) return null;
-  const behind = repos.filter((r) => r.pending > 0);
   return (
-    <section className="mb-10 rounded-2xl bg-card p-4 ring-1 ring-border sm:p-5" aria-labelledby="env-summary">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 id="env-summary" className="flex items-center gap-2 font-display text-xl font-semibold tracking-tight">
-            <GitBranch className="size-5 text-primary" />
-            Ramas y ambientes
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {behind.length
-              ? `${behind.length} ${behind.length === 1 ? "repo tiene" : "repos tienen"} commits tuyos sin llegar a producción.`
-              : "Todo lo tuyo ya llegó a la última rama de cada repo."}{" "}
-            Según el último fetch.
-          </p>
-        </div>
-        <Link href="/ramas" className="press flex h-10 items-center gap-2 rounded-md px-3 text-sm font-semibold text-primary hover:bg-accent">
+    <section className="mb-10" aria-labelledby="env-summary">
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <h2 id="env-summary" className="font-display text-lg font-semibold tracking-tight">
+          Ramas y ambientes
+        </h2>
+        <Link href="/ramas" className="press flex h-10 items-center gap-1.5 rounded-md px-2 text-sm font-semibold text-primary hover:bg-accent">
           Ver ramas
           <ArrowRight className="size-4" />
         </Link>
       </div>
-
-      <ul className="mt-4 grid gap-2">
-        {repos.slice(0, SHOWN).map((r) => (
-          <li key={r.repo}>
-            <Link
-              href={`/ramas?repo=${encodeURIComponent(r.repo)}`}
-              className="group grid gap-2 rounded-xl px-3 py-2.5 transition-colors duration-150 hover:bg-muted/70 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto] sm:items-center sm:gap-4"
-            >
-              <span className="truncate text-sm font-semibold">{r.repo}</span>
-              <ol className="flex min-w-0 flex-wrap items-center gap-1.5" aria-label={`Commits por rama en ${r.repo}`}>
-                {r.envs.map(({ env, n }, i) => (
-                  <li key={env} className="flex items-center gap-1.5">
-                    {i > 0 && <span aria-hidden className="h-px w-3 bg-border" />}
-                    <span
-                      className="flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold whitespace-nowrap"
-                      style={{ background: `color-mix(in oklab, var(--b-${family(env)}) 14%, transparent)` }}
-                      title={`${nCommits(n)} en origin/${env}`}
-                    >
-                      <span className="size-2 rounded-full" style={{ background: `var(--b-${family(env)})` }} />
-                      {short(env)}
-                      <span className="font-normal text-muted-foreground tabular-nums">{n}</span>
+      <ul className="grid gap-1">
+        {repos.slice(0, SHOWN).map((r) => {
+          const reached = r.envs.at(-1)?.n ?? 0;
+          const base = reached + r.pending;
+          const pct = base ? Math.round((reached / base) * 100) : 100;
+          return (
+            <li key={r.repo}>
+              <Link
+                href={`/ramas?repo=${encodeURIComponent(r.repo)}`}
+                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 rounded-lg px-2 py-2 transition-colors duration-150 hover:bg-muted/70 sm:min-h-10 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_8.5rem] sm:py-0"
+                title={`${reached} de ${base} commits tuyos ya están en ${r.last}`}
+              >
+                <span className="truncate text-sm font-medium">{r.repo}</span>
+                <span className="text-right text-sm tabular-nums whitespace-nowrap sm:col-start-3 sm:row-start-1">
+                  {r.pending ? (
+                    <span className="font-semibold">
+                      {r.pending} <span className="font-normal text-muted-foreground">sin {r.last}</span>
                     </span>
-                  </li>
-                ))}
-              </ol>
-              <span className="text-sm whitespace-nowrap sm:text-right">
-                {r.pending ? (
-                  <span className="font-semibold text-[var(--t-fix)]">
-                    {r.pending} sin llegar a {r.last}
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground">al día</span>
-                )}
-                {r.local > 0 && <span className="ml-2 text-muted-foreground">· {r.local} solo local</span>}
-              </span>
-            </Link>
-          </li>
-        ))}
+                  ) : (
+                    <span className="text-muted-foreground">al día</span>
+                  )}
+                </span>
+                <span className="col-span-2 h-2 overflow-hidden rounded-full bg-muted sm:col-span-1 sm:col-start-2 sm:row-start-1" role="img" aria-label={`${pct} % en ${r.last}`}>
+                  <span className="block h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
+                </span>
+              </Link>
+            </li>
+          );
+        })}
       </ul>
       {repos.length > SHOWN && (
-        <p className="mt-2 px-3 text-sm text-muted-foreground">
-          Y {repos.length - SHOWN} {repos.length - SHOWN === 1 ? "repo más" : "repos más"} en <Link href="/ramas" className="font-semibold text-primary hover:underline">Ramas</Link>.
+        <p className="mt-1 px-2 text-sm text-muted-foreground">
+          y {repos.length - SHOWN} {repos.length - SHOWN === 1 ? "repo más" : "repos más"} en{" "}
+          <Link href="/ramas" className="font-semibold text-primary hover:underline">
+            Ramas
+          </Link>
         </p>
       )}
     </section>

@@ -176,9 +176,12 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       </section>
 
       <AutoRefresh />
-      <FadeIn i={3}>
-        <EnvSummary repos={envSummary} />
-      </FadeIn>
+      {/* Solo en la vista general: con un mes en foco (o en Pendientes/Hechas) distrae. */}
+      {!month && !view && (
+        <FadeIn i={3}>
+          <EnvSummary repos={envSummary} />
+        </FadeIn>
+      )}
       <FadeIn i={3}>
         <TabNav
           active={view}
