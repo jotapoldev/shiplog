@@ -2,6 +2,8 @@
 
 **Your git history as a work log.** A local web app that reads the repos in a folder and shows what you did each day, how your commits flow between `develop → qa → uat → main`, and what is still waiting to be promoted. Spanish UI, runs 100% on your machine.
 
+**Live demo (read-only, sample repos):** [shiplog.jotapol.com](https://shiplog.jotapol.com)
+
 ![Branches view](docs/screenshots/ramas.png)
 
 [Español abajo ↓](#español)
@@ -63,6 +65,8 @@ Next.js 16 (App Router), React 19, Tailwind CSS 4, Base UI, Motion, Drizzle ORM 
 ---
 
 ## Español
+
+**Demo en vivo (solo lectura, con repos de ejemplo):** [shiplog.jotapol.com](https://shiplog.jotapol.com)
 
 **Tu historial de git convertido en bitácora.** App web local que lee los repos de una carpeta y te muestra qué hiciste cada día, cómo fluyen tus commits entre `develop → qa → uat → main` y qué falta subir a cada ambiente.
 
