@@ -19,6 +19,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="es" suppressHydrationWarning className={`${sans.variable} ${display.variable} ${mono.variable} antialiased`}>
       <body className="min-h-dvh">
+        {/* Taplog: solo en la demo pública; cuenta la visita sin datos de la persona. */}
+        {READONLY && <script dangerouslySetInnerHTML={{ __html: '(()=>{let l;const h=()=>{const p=location.pathname;if(p===l)return;const r=l?location.origin+"/":document.referrer,q=l?"":location.search;l=p;navigator.sendBeacon("https://jotapol.com/r/hit",JSON.stringify({s:"shiplog",p,r,q}))},w=history.pushState;history.pushState=function(){w.apply(this,arguments);h()};addEventListener("popstate",h);h()})()' }} />}
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {READONLY && (
             <p className="bg-primary px-4 py-2 text-center text-sm text-primary-foreground">
